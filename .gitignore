@@ -15,6 +15,8 @@
 /zelda3.smc
 *.sfc
 *.smc
+*.ips
+*.bps
 /tables/
 /saves/*.sav
 /saves/sram.dat
@@ -29,6 +31,17 @@ __pycache__
 /msu/
 /tmp/
 /zelda3_assets.dat
+/assets/dialogue*.txt
+/assets/map32_to_map16.txt
+/assets/music_info.yaml
+/assets/sfx.txt
+/assets/sound_*.txt
+/assets/font*.png
+/assets/linksprite.png
+/assets/hud_icons.png
+/assets/generated_*.h
+/assets/sound/
+/assets/sprites/*.png
 /SDL2.dll
 /zelda3.*.ini
 /zelda3.wiki

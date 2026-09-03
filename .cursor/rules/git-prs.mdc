@@ -1,0 +1,11 @@
+---
+description: Atomic PRs on the jslay88 fork, never on snesrev by default
+alwaysApply: true
+---
+
+# Git and PRs
+
+- One concern per PR. Stack or sequence: build/compiler fixes, then features, then docs.
+- Target `master` on `jslay88/zelda3`. Create with `gh pr create --repo jslay88/zelda3 --base master --head <branch>`. Bare `gh pr create` opens against `snesrev/zelda3`.
+- Short imperative commit subjects. No agent attribution trailers.
+- Stage named files only. Recheck the file list for `.sfc` / `zelda3_assets.dat` / extracted dumps.

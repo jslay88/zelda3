@@ -5562,7 +5562,7 @@ uint8 ThievesAttic_DrawLightenedHole(uint16 pos6, uint16 a, Point16U *pt) {  // 
 uint8 HandleItemTileAction_Dungeon(uint16 x, uint16 y) {  // 81dabb
   if (!(link_item_in_hand & 2)) {
     if (!(enhanced_features0 & kFeatures0_BreakPotsWithSword) ||
-        button_b_frames == 0 || link_sword_type == 1)
+        link_sword_type == 0 || link_sword_type == 0xff)
       return 0;
   }
   uint16 pos = (y & 0x1f8) * 8 + x + (link_is_on_lower_level ? 0x1000 : 0);

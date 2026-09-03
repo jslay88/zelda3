@@ -27,6 +27,7 @@
 #include "util.h"
 #include "audio.h"
 #include "settings_menu.h"
+#include "extract.h"
 
 static bool g_run_without_emu = 0;
 
@@ -454,13 +455,22 @@ void Settings_ApplyVideo(void) {
 int main(int argc, char** argv) {
   argc--, argv++;
   const char *config_file = NULL;
-  if (argc >= 2 && strcmp(argv[0], "--config") == 0) {
-    config_file = argv[1];
-    argc -= 2, argv += 2;
-  } else {
-    SwitchDirectory();
+  const char *rom_override = NULL;
+  while (argc >= 1) {
+    if (argc >= 2 && strcmp(argv[0], "--config") == 0) {
+      config_file = argv[1];
+      argc -= 2, argv += 2;
+    } else if (argc >= 2 && strcmp(argv[0], "--rom") == 0) {
+      rom_override = argv[1];
+      argc -= 2, argv += 2;
+    } else {
+      break;
+    }
   }
+  if (!config_file)
+    SwitchDirectory();
   ParseConfigFile(config_file);
+  Extract_EnsureAssets(rom_override);
   LoadAssets();
   LoadLinkGraphics();
 
@@ -982,7 +992,7 @@ static void LoadAssets() {
     uint8 *bps, *bps_src;
     bps = ReadWholeFile("zelda3_assets.bps", &bps_length);
     if (!bps)
-      Die("Failed to read zelda3_assets.dat. Please see the README for information about how you get this file.");
+      Die("Failed to read zelda3_assets.dat. Launch the game and select a US ALttP ROM, or pass --rom path/to/zelda3.sfc.");
     bps_src = ReadWholeFile("zelda3.sfc", &bps_src_length);
     if (!bps_src)
       Die("Missing file: zelda3.sfc");

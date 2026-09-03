@@ -530,3 +530,145 @@ void ParseConfigFile(const char *filename) {
   }
   RegisterDefaultKeys();
 }
+
+static const char *IniBool(bool v) {
+  return v ? "1" : "0";
+}
+
+static char *DupIniSection(const char *path, const char *section) {
+  FILE *in = fopen(path, "r");
+  if (!in)
+    return NULL;
+  size_t cap = 0, len = 0;
+  char *out = NULL;
+  char line[512];
+  bool in_sec = false;
+  while (fgets(line, sizeof(line), in)) {
+    if (line[0] == '[') {
+      if (in_sec)
+        break;
+      char tmp[64];
+      snprintf(tmp, sizeof(tmp), "%s", line);
+      for (char *p = tmp; *p; p++) {
+        if (*p == '\r' || *p == '\n') {
+          *p = 0;
+          break;
+        }
+      }
+      if (StringEqualsNoCase(tmp, section))
+        in_sec = true;
+    } else if (in_sec) {
+      size_t n = strlen(line);
+      if (len + n + 1 > cap) {
+        cap = cap ? cap * 2 : 512;
+        while (len + n + 1 > cap)
+          cap *= 2;
+        char *nbuf = realloc(out, cap);
+        if (!nbuf) {
+          free(out);
+          fclose(in);
+          return NULL;
+        }
+        out = nbuf;
+      }
+      memcpy(out + len, line, n + 1);
+      len += n;
+    }
+  }
+  fclose(in);
+  return out;
+}
+
+void WriteUserConfigFile(void) {
+  char *keymap = DupIniSection("zelda3.user.ini", "[KeyMap]");
+  char *gamepad = DupIniSection("zelda3.user.ini", "[GamepadMap]");
+  FILE *f = fopen("zelda3.user.ini", "w");
+  if (!f) {
+    fprintf(stderr, "Warning: Unable to write zelda3.user.ini\n");
+    free(keymap);
+    free(gamepad);
+    return;
+  }
+
+  int h = g_config.extend_y ? 240 : 224;
+  const char *aspect = "4:3";
+  int e1610 = (h * 16 / 10 - 256) / 2;
+  if (g_config.extended_aspect_ratio == e1610)
+    aspect = "16:10";
+  else if (g_config.extended_aspect_ratio)
+    aspect = "16:9";
+
+  const char *outm = "SDL";
+  if (g_config.output_method == kOutputMethod_SDLSoftware) outm = "SDL-Software";
+  else if (g_config.output_method == kOutputMethod_OpenGL) outm = "OpenGL";
+  else if (g_config.output_method == kOutputMethod_OpenGL_ES) outm = "OpenGL ES";
+
+  const char *msu = "false";
+  uint8 m = g_config.enable_msu;
+  if (m == (kMsuEnabled_MsuDeluxe | kMsuEnabled_Opuz)) msu = "deluxe-opuz";
+  else if (m & kMsuEnabled_Opuz) msu = "opuz";
+  else if (m & kMsuEnabled_MsuDeluxe) msu = "deluxe";
+  else if (m) msu = "true";
+
+  fprintf(f, "[General]\n");
+  fprintf(f, "Autosave = %s\n", IniBool(g_config.autosave));
+  fprintf(f, "DisplayPerfInTitle = %s\n", IniBool(g_config.display_perf_title));
+  fprintf(f, "ExtendedAspectRatio = %s%s\n", g_config.extend_y ? "extend_y, " : "", aspect);
+  fprintf(f, "DisableFrameDelay = %s\n", IniBool(g_config.disable_frame_delay));
+  if (g_config.language && *g_config.language)
+    fprintf(f, "Language = %s\n", g_config.language);
+
+  fprintf(f, "\n[Graphics]\n");
+  if (g_config.window_width && g_config.window_height)
+    fprintf(f, "WindowSize = %dx%d\n", g_config.window_width, g_config.window_height);
+  else
+    fprintf(f, "WindowSize = Auto\n");
+  fprintf(f, "Fullscreen = %d\n", g_config.fullscreen);
+  fprintf(f, "WindowScale = %d\n", g_config.window_scale ? g_config.window_scale : 2);
+  fprintf(f, "NewRenderer = %s\n", IniBool(g_config.new_renderer));
+  fprintf(f, "EnhancedMode7 = %s\n", IniBool(g_config.enhanced_mode7));
+  fprintf(f, "IgnoreAspectRatio = %s\n", IniBool(g_config.ignore_aspect_ratio));
+  fprintf(f, "SeamlessOverworld = %s\n", IniBool(g_config.seamless_overworld));
+  fprintf(f, "NoSpriteLimits = %s\n", IniBool(g_config.no_sprite_limits));
+  fprintf(f, "OutputMethod = %s\n", outm);
+  fprintf(f, "LinearFiltering = %s\n", IniBool(g_config.linear_filtering));
+  fprintf(f, "DimFlashes = %s\n", (g_config.features0 & kFeatures0_DimFlashes) ? "1" : "0");
+  if (g_config.shader && *g_config.shader)
+    fprintf(f, "Shader = %s\n", g_config.shader);
+  if (g_config.link_graphics && *g_config.link_graphics)
+    fprintf(f, "LinkGraphics = %s\n", g_config.link_graphics);
+
+  fprintf(f, "\n[Sound]\n");
+  fprintf(f, "EnableAudio = %s\n", IniBool(g_config.enable_audio));
+  fprintf(f, "AudioFreq = %d\n", g_config.audio_freq);
+  fprintf(f, "AudioChannels = %d\n", g_config.audio_channels);
+  fprintf(f, "AudioSamples = %d\n", g_config.audio_samples);
+  fprintf(f, "EnableMSU = %s\n", msu);
+  if (g_config.msu_path)
+    fprintf(f, "MSUPath = %s\n", g_config.msu_path);
+  fprintf(f, "ResumeMSU = %s\n", IniBool(g_config.resume_msu));
+  fprintf(f, "MSUVolume = %d\n", g_config.msuvolume);
+
+  fprintf(f, "\n[Features]\n");
+  fprintf(f, "ItemSwitchLR = %s\n", (g_config.features0 & kFeatures0_SwitchLR) ? "1" : "0");
+  fprintf(f, "ItemSwitchLRLimit = %s\n", (g_config.features0 & kFeatures0_SwitchLRLimit) ? "1" : "0");
+  fprintf(f, "TurnWhileDashing = %s\n", (g_config.features0 & kFeatures0_TurnWhileDashing) ? "1" : "0");
+  fprintf(f, "MirrorToDarkworld = %s\n", (g_config.features0 & kFeatures0_MirrorToDarkworld) ? "1" : "0");
+  fprintf(f, "CollectItemsWithSword = %s\n", (g_config.features0 & kFeatures0_CollectItemsWithSword) ? "1" : "0");
+  fprintf(f, "BreakPotsWithSword = %s\n", (g_config.features0 & kFeatures0_BreakPotsWithSword) ? "1" : "0");
+  fprintf(f, "DisableLowHealthBeep = %s\n", (g_config.features0 & kFeatures0_DisableLowHealthBeep) ? "1" : "0");
+  fprintf(f, "SkipIntroOnKeypress = %s\n", (g_config.features0 & kFeatures0_SkipIntroOnKeypress) ? "1" : "0");
+  fprintf(f, "ShowMaxItemsInYellow = %s\n", (g_config.features0 & kFeatures0_ShowMaxItemsInYellow) ? "1" : "0");
+  fprintf(f, "MoreActiveBombs = %s\n", (g_config.features0 & kFeatures0_MoreActiveBombs) ? "1" : "0");
+  fprintf(f, "CarryMoreRupees = %s\n", (g_config.features0 & kFeatures0_CarryMoreRupees) ? "1" : "0");
+  fprintf(f, "MiscBugFixes = %s\n", (g_config.features0 & kFeatures0_MiscBugFixes) ? "1" : "0");
+  fprintf(f, "GameChangingBugFixes = %s\n", (g_config.features0 & kFeatures0_GameChangingBugFixes) ? "1" : "0");
+  fprintf(f, "CancelBirdTravel = %s\n", (g_config.features0 & kFeatures0_CancelBirdTravel) ? "1" : "0");
+  if (keymap && *keymap)
+    fprintf(f, "\n[KeyMap]\n%s", keymap);
+  if (gamepad && *gamepad)
+    fprintf(f, "\n[GamepadMap]\n%s", gamepad);
+  fclose(f);
+  free(keymap);
+  free(gamepad);
+}

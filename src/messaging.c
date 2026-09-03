@@ -16,6 +16,7 @@
 #include "attract.h"
 #include "nmi.h"
 #include "assets.h"
+#include "settings_menu.h"
 
 static void WorldMap_AddSprite(int spr, uint8 big, uint8 flags, uint8 ch, uint16 x, uint16 y);
 static bool WorldMap_CalculateOamCoordinates(Point16U *pt);
@@ -354,29 +355,16 @@ void Module0E_09_BluePotion() {  // 80f918
 }
 
 void Module0E_0B_SaveMenu() {  // 80f9fa
-  // This is the continue / save and quit menu
+  // Continue / Options / Save and Quit
   if (!player_is_indoors)
     Overworld_DwDeathMountainPaletteAnimation();
-  RenderText();
   flag_update_hud_in_nmi = 0;
   nmi_disable_core_updates = 0;
   if (subsubmodule_index < 3)
     subsubmodule_index++;
   else
     nmi_load_bg_from_vram = 0;
-  if (!submodule_index) {
-    subsubmodule_index = 0;
-    nmi_load_bg_from_vram = 1;
-    if (choice_in_multiselect_box) {
-      sound_effect_ambient = 15;
-      main_module_index = 23;
-      submodule_index = 1;
-      index_of_changable_dungeon_objs[0] = 0;
-      index_of_changable_dungeon_objs[1] = 0;
-    } else {
-      choice_in_multiselect_box = choice_in_multiselect_box_bak;
-    }
-  }
+  SettingsPauseChooser_Run();
 }
 
 void Module1B_SpawnSelect() {  // 828586
@@ -2924,12 +2912,9 @@ void Death_PrepFaint() {  // 8ffa6f
 
 void DisplaySelectMenu() {
   choice_in_multiselect_box_bak = choice_in_multiselect_box;
-  dialogue_message_index = 0x186;
-  uint8 bak = main_module_index;
-  Main_ShowTextMessage();
-  main_module_index = bak;
   subsubmodule_index = 0;
   submodule_index = 11;
   saved_module_for_menu = main_module_index;
   main_module_index = 14;
+  SettingsPauseChooser_Reset();
 }

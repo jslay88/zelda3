@@ -12,6 +12,7 @@
 #include "snes/snes_regs.h"
 #include "assets.h"
 #include "ow_wide.h"
+#include "settings_menu.h"
 
 const uint16 kOverworld_OffsetBaseX[64] = {
   0,     0, 0x400, 0x600, 0x600, 0xa00, 0xa00, 0xe00,
@@ -1119,6 +1120,10 @@ void Overworld_LoadOverlays2() {  // 82af1e
   BG1HOFS_subpixel = 0;
 
   int si = overworld_screen_index;
+  if (g_dev_force_overlay >= 0 && si < 0x80) {
+    xv = (uint16)g_dev_force_overlay;
+    goto load_overlay;
+  }
   if (si >= 0x80) {
     xv = 0x97;
     if (dungeon_room_index == 0x180) {

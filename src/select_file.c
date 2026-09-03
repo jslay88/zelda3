@@ -6,6 +6,7 @@
 #include "overworld.h"
 #include "messaging.h"
 #include "sprite.h"
+#include "settings_menu.h"
 
 #define selectfile_R16 g_ram[0xc8]
 #define selectfile_R17 g_ram[0xc9]
@@ -308,6 +309,17 @@ void FileSelect_TriggerNameStripesAndAdvance() {  // 8cceb1
 
 void FileSelect_Main() {  // 8ccebd
   static const uint8 kSelectFile_Faerie_Y[5] = {0x4a, 0x6a, 0x8a, 0xaf, 0xbf};
+
+  if (SettingsMenu_IsOpen()) {
+    SettingsMenu_Run();
+    return;
+  }
+  if (filtered_joypad_H & kJoypadH_Start) {
+    SettingsMenu_Open(kSettingsFrom_FileSelect);
+    filtered_joypad_H = 0;
+    filtered_joypad_L = 0;
+    return;
+  }
 
   const uint8 *cart = g_zenv.sram;
 

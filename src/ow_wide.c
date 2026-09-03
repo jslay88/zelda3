@@ -8,6 +8,7 @@
 #include "snes/ppu.h"
 #include "variables.h"
 #include "zelda_rtl.h"
+#include "settings_menu.h"
 
 enum {
   kOwWideCacheSlots = 16,
@@ -86,6 +87,8 @@ static const uint16 *OwWide_CachedMap16(int screen) {
 }
 
 static bool OwWide_LiveTileattrOk(void) {
+  if (g_dev_skip_live_tileattr)
+    return false;
   return submodule_index == 0 &&
          g_ow_wide_tileattr_area >= 0 &&
          BYTE(overworld_screen_index) < 0x80 &&
@@ -243,7 +246,7 @@ void OwWide_OnOverworldLoaded(void) {
 }
 
 void OwWide_FillFrame(uint8 *pixel_buffer, size_t pitch, int height) {
-  if (!g_config.seamless_overworld || !pixel_buffer)
+  if (g_dev_skip_fill || !g_config.seamless_overworld || !pixel_buffer)
     return;
   Ppu *ppu = g_zenv.ppu;
   if (!ppu || !ppu->extraLeftRight || ppu->mode == 7 || ppu->forcedBlank)

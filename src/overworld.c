@@ -495,6 +495,12 @@ setsong:
     LoadGearPalettes_bunny();
   }
   BGMODE_copy = 9;
+  /* Gameplay nametables are 64x64 (Intro_InitializeBackgroundSettings).
+     Attract story scenes use 32x32; WritePpuRegisters never puts these
+     back, so a house/cave exit would keep 32x32 and wrap the OW map. */
+  zelda_ppu_write(BG1SC, 0x13);
+  zelda_ppu_write(BG2SC, 0x03);
+  zelda_ppu_write(BG3SC, 0x63);
   dung_want_lights_out = 0;
   dung_hdr_collision = 0;
   link_is_on_lower_level = 0;
@@ -1134,6 +1140,7 @@ void Overworld_LoadOverlays2() {  // 82af1e
       sound_effect_ambient = 1;  // zora falls
 getout:
     TS_copy = 0;
+    zelda_ppu_write(BG1SC, 0x13);
     submodule_index++;
     return;
   }
@@ -1174,6 +1181,7 @@ load_overlay:
     TS_copy = 0, CGADSUB_copy = 0x20;
 
   LoadOverworldOverlay();
+  zelda_ppu_write(BG1SC, 0x13);
   if (BYTE(overlay_index) == 0x94)
     BG1VOFS_copy2 |= 0x100;
 

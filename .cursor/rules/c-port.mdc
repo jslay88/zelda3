@@ -1,0 +1,14 @@
+---
+description: C port conventions for zelda3 game and PPU code
+globs: "**/*.{c,h}"
+alwaysApply: false
+---
+
+# C port
+
+- Compile as gnu17. C23 `()` is a no-arg prototype. If gcc 16 errors on a call, match the real signature (`ppu_init()` takes no args; `VWF_RenderSingle` takes `int c`). Do not silence `-Werror`.
+- Match the surrounding file: types (`uint8`/`uint16`), SNES names, brace style, CRLF if the file is already CRLF.
+- Do not rename decompiled functions or globals for clarity. Do not reformat a file you barely touched.
+- `src/*.c` is already in the Makefile wildcard. New files still need a header and a call site.
+- Keep RAM save/restore explicit when a helper reuses decode buffers (`g_ram + 0x14000`, `map16_decode_*`).
+- Prefer signed math when subtracting `uint16` scroll coords (`BG2HOFS_copy2 - xstart`). Unsigned underflow wraps the side-space tilemap.

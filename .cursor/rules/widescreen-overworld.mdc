@@ -1,0 +1,20 @@
+---
+description: Seamless 16:9 overworld neighbor fill (ow_wide)
+globs: src/ow_wide.c,src/ow_wide.h,src/overworld.c,src/zelda_rtl.c,src/config.c,src/config.h
+alwaysApply: false
+---
+
+# Widescreen overworld
+
+`OwWide_FillFrame` paints the PPU extra-left/right pixels with neighbor map16. Original 16:9 only showed tiles already in the loaded screen, then clipped to black.
+
+Landmines:
+
+- Live `overworld_tileattr` is valid only when `submodule_index == 0` **and** `g_ow_wide_tileattr_area` matches the current screen. During transitions the 2x2 is rebuilt for the destination while the camera is still on the old screen. Using live tileattr there splits the frame (center seam, Y-shift, one side dark).
+- Call `OwWide_OnOverworldLoaded` from `Overworld_DrawQuadrantsAndOverlays`, not from `Overworld_LoadGFXAndScreenSize`. LoadGFX runs mid-transition and would stamp the new area onto the old tileattr.
+- After `Overworld_LoadGFXAndScreenSize` in `OverworldHandleTransitions`, prefetch with `OwWide_PrefetchCamera` only.
+- `ConfigurePpuSideSpace` must treat `HOFS - xstart` as signed and clamp `< 0` to 0.
+- SNES tile `0x4000` set means do **not** invert px (`if (!(tile & 0x4000)) px = 7 - px`).
+- Special overworld (`overworld_screen_index >= 0x80`) is out of scope. East/south world edge: do not treat small-screen 2x2 wrap as a real neighbor.
+
+Known gaps (do not "fix" by disabling fill): no neighbor sprites, tileset mismatches at borders, dungeons still black, HUD stays 256px, 8-bit OAM can drop projectiles.

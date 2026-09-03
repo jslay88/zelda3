@@ -1,0 +1,20 @@
+---
+description: Never commit the ROM or extracted Nintendo assets
+alwaysApply: true
+---
+
+# Copyrighted assets
+
+This is a Nintendo game port. The US ROM and anything extracted from it stay on disk, never in git.
+
+Do not add or stage:
+
+- `zelda3.sfc`, `*.sfc`, `*.smc`
+- `zelda3_assets.dat`
+- `tables/`
+- extracted `assets/` dumps (overworld/dungeon yaml, `img/`, `sprites/*.png`, `sound/`, dialogue, fonts, `linksprite.png`, `hud_icons.png`)
+- `saves/`, `*.o`, the `zelda3` binary
+
+Do not paste ROM bytes, map16 tables, or ripped graphics into commits, PRs, or issue text.
+
+`git add` only named source paths. If `git status` shows a `.sfc` or `zelda3_assets.dat`, stop.

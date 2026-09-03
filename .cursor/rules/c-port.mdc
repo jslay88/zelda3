@@ -12,3 +12,4 @@ alwaysApply: false
 - `src/*.c` is already in the Makefile wildcard. New files still need a header and a call site.
 - Keep RAM save/restore explicit when a helper reuses decode buffers (`g_ram + 0x14000`, `map16_decode_*`).
 - Prefer signed math when subtracting `uint16` scroll coords (`BG2HOFS_copy2 - xstart`). Unsigned underflow wraps the side-space tilemap.
+- Do not check in ROM bytes or extract dumps as C arrays, headers, or `#include` data. Keep that on disk in gitignored extract outputs.

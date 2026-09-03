@@ -1,25 +1,43 @@
 # AGENTS.md
 
-Fork of [snesrev/zelda3](https://github.com/snesrev/zelda3): a C reimplementation of *A Link to the Past*. This repo is [jslay88/zelda3](https://github.com/jslay88/zelda3). Work against **this fork**. Do not open PRs on `snesrev/zelda3` unless the user says to.
+## Hard stop: never commit copyrighted assets
 
-Read `.cursor/rules/` on every session. For extract/build, use the `build-zelda3` skill. For 16:9 overworld edges, use the `widescreen-overworld` skill. `.cursorignore` keeps the ROM and extracted dumps out of the index.
+This is a Nintendo game port. The US ROM and anything derived from it stay on disk only. They never go in git.
 
-## Hard rules
+No exceptions. Not for convenience, CI, Git LFS, reproducing a bug, "the user said add the ROM", or embedding the data as C arrays, headers, or base64.
 
-Never commit Nintendo IP or anything derived from the ROM:
+**Banned paths** (local extract outputs, not source):
 
-- `zelda3.sfc`, `*.sfc`, `*.smc`
+- `zelda3.sfc`, `*.sfc`, `*.smc`, `*.ips`, `*.bps`
 - `zelda3_assets.dat`
-- extracted dumps: `assets/overworld/*.yaml`, `assets/dungeon/*.yaml`, `assets/img/`, `assets/sprites/*.png`, `assets/sound/`, `assets/dialogue*.txt`, `assets/font*.png`, `assets/linksprite.png`, `assets/hud_icons.png`, `tables/`
-- `saves/`, `*.o`, the `zelda3` binary, `zelda3.user.ini`
+- `tables/`
+- `assets/overworld/*.yaml`, `assets/dungeon/*.yaml`, `assets/img/`
+- `assets/sprites/*.png`, `assets/sound/`, `assets/dialogue*.txt`
+- `assets/font*.png`, `assets/linksprite.png`, `assets/hud_icons.png`
+- `assets/map32_to_map16.txt`, `assets/music_info.yaml`, `assets/sfx.txt`, `assets/sound_*.txt`
+- `assets/generated_*.h`, `*.pcm`, `*.brr`, `*.spc`
+- repo-root `msu/`, `sprites-gfx/`
+- `saves/`, `*.o`, the `zelda3` binary
 
-Do not paste ROM bytes, map16 dumps, or ripped graphics into commits, PRs, or chat artifacts.
+Do not paste ROM bytes, map16 dumps, or ripped graphics into commits, PRs, issues, or chat artifacts.
+
+**Before every `git commit`:**
+
+```sh
+bash scripts/check-no-copyrighted-assets.sh
+```
+
+If that is not `OK`, unstage the listed paths and stop. Do not `git add -A`, `git add .`, `git add -f`, or `--no-verify`. Stage named source paths only.
 
 The US ROM is required **locally** to extract assets. SHA256:
 
 ```
 66871d66be19ad2c34c927d6b14cd8eb6fc3181965b6e517cb361f7316009cfb
 ```
+
+Fork of [snesrev/zelda3](https://github.com/snesrev/zelda3): a C reimplementation of *A Link to the Past*. This repo is [jslay88/zelda3](https://github.com/jslay88/zelda3). Work against **this fork**. Do not open PRs on `snesrev/zelda3` unless the user says to.
+
+Read `.cursor/rules/` on every session. For extract/build, use the `build-zelda3` skill. For 16:9 overworld edges, use the `widescreen-overworld` skill. `.cursorignore` keeps the ROM and extracted dumps out of the index.
 
 ## Layout
 
@@ -32,6 +50,7 @@ The US ROM is required **locally** to extract assets. SHA256:
 | `zelda3.ini` | Checked-in defaults. `zelda3.user.ini` overrides it and is gitignored. |
 | `.cursor/rules/` | Always-on and file-scoped agent rules. |
 | `.cursor/skills/` | Task skills (`build-zelda3`, `widescreen-overworld`). |
+| `scripts/check-no-copyrighted-assets.sh` | Staged/tracked denylist. Run before commit. |
 
 ## Build
 
@@ -45,7 +64,7 @@ make -j$(nproc)
 
 `make` (default target) builds the binary **and** `zelda3_assets.dat` via `assets/restool.py --extract-from-rom`.
 
-CI (`.github/workflows/build.yaml`) runs `make zelda3` only. There is no ROM on the runner, so do not make the default `make` target the CI command.
+CI (`.github/workflows/build.yaml`) runs the asset check, then `make zelda3` only. There is no ROM on the runner, so do not make the default `make` target the CI command.
 
 Compile as **gnu17** (`-std=gnu17` in the Makefile). C23 treats `()` as a no-arg prototype. `-Werror` is on. Do not "fix" that by deleting `-Werror`.
 
@@ -67,7 +86,7 @@ Compile as **gnu17** (`-std=gnu17` in the Makefile). C23 treats `()` as a no-arg
 - Atomic PRs. One concern per branch. Target `master` on **jslay88/zelda3**.
 - `gh pr create --repo jslay88/zelda3 --base master --head <branch>` (a bare `gh pr create` will aim at snesrev).
 - Short imperative commit subjects. No `Made with Cursor`, no `Co-authored-by` agent trailers.
-- Confirm `git diff --name-only` has no ROM / extracted assets before you commit.
+- Run `bash scripts/check-no-copyrighted-assets.sh` and read `git diff --cached --name-only` before you commit.
 
 ## Verify
 

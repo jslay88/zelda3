@@ -1,11 +1,15 @@
 zelda3.sfc
 *.sfc
 *.smc
+*.ips
+*.bps
 zelda3_assets.dat
 /zelda3
 *.o
 /saves/
 /tables/
+/msu/
+/sprites-gfx/
 /assets/overworld/*.yaml
 /assets/dungeon/*.yaml
 /assets/img/
@@ -15,5 +19,9 @@ zelda3_assets.dat
 /assets/font*.png
 /assets/linksprite.png
 /assets/hud_icons.png
-/msu/
+/assets/map32_to_map16.txt
+/assets/music_info.yaml
+/assets/sfx.txt
+/assets/sound_*.txt
+/assets/generated_*.h
 __pycache__/

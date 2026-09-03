@@ -1,20 +1,24 @@
 ---
-description: Never commit the ROM or extracted Nintendo assets
+description: Never commit the ROM or extracted Nintendo assets. Always apply. No exceptions.
 alwaysApply: true
 ---
 
-# Copyrighted assets
+# Copyrighted assets (hard stop)
 
-This is a Nintendo game port. The US ROM and anything extracted from it stay on disk, never in git.
+Never commit Nintendo IP or ROM-derived files. No exceptions: not CI, LFS, "user said add the ROM", bug repro, or embedding as C arrays / headers / base64.
 
-Do not add or stage:
+Do not stage:
 
-- `zelda3.sfc`, `*.sfc`, `*.smc`
-- `zelda3_assets.dat`
-- `tables/`
-- extracted `assets/` dumps (overworld/dungeon yaml, `img/`, `sprites/*.png`, `sound/`, dialogue, fonts, `linksprite.png`, `hud_icons.png`)
-- `saves/`, `*.o`, the `zelda3` binary
+- `*.sfc` `*.smc` `*.ips` `*.bps` `zelda3_assets.dat`
+- `tables/` repo-root `msu/` `sprites-gfx/`
+- extract dumps: overworld/dungeon yaml, `assets/img/`, `assets/sprites/*.png`, `assets/sound/`, dialogue, fonts, `linksprite.png`, `hud_icons.png`, `map32_to_map16.txt`, `music_info.yaml`, `sfx.txt`, `sound_*.txt`, `generated_*.h`, `*.pcm` `*.brr` `*.spc`
 
 Do not paste ROM bytes, map16 tables, or ripped graphics into commits, PRs, or issue text.
 
-`git add` only named source paths. If `git status` shows a `.sfc` or `zelda3_assets.dat`, stop.
+Before every commit:
+
+```sh
+bash scripts/check-no-copyrighted-assets.sh
+```
+
+If it is not `OK`, unstage and stop. Never `git add -A`, `git add .`, `git add -f`, or `--no-verify`. Stage named source paths only.

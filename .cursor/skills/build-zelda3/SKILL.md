@@ -7,7 +7,13 @@ description: Extract ROM assets and compile zelda3. Use when building, running m
 
 ## Never commit
 
-`zelda3.sfc`, `zelda3_assets.dat`, `tables/`, extracted `assets/` dumps. See [AGENTS.md](../../../AGENTS.md).
+ROM and extract outputs stay on disk. See [AGENTS.md](../../../AGENTS.md). Before every commit:
+
+```sh
+bash scripts/check-no-copyrighted-assets.sh
+```
+
+If that fails, unstage and stop. Never `git add -A`, `git add -f`, or `--no-verify`. Do not add the ROM to CI, LFS, or as a C array.
 
 ## Local build
 

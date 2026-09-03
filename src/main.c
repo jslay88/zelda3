@@ -26,6 +26,7 @@
 #include "load_gfx.h"
 #include "util.h"
 #include "audio.h"
+#include "settings_menu.h"
 
 static bool g_run_without_emu = 0;
 
@@ -42,6 +43,7 @@ static void OpenOneGamepad(int i);
 static void HandleVolumeAdjustment(int volume_adjustment);
 static void LoadAssets();
 static void SwitchDirectory();
+void OpenGLRenderer_Create(struct RendererFuncs *funcs, bool use_opengl_es);
 
 enum {
   kDefaultFullscreen = 0,
@@ -175,6 +177,10 @@ static SDL_mutex *g_audio_mutex;
 static uint8 *g_audiobuffer, *g_audiobuffer_cur, *g_audiobuffer_end;
 static int g_frames_per_block;
 static uint8 g_audio_channels;
+static SDL_AudioDeviceID g_audio_device;
+static bool g_need_audio_reopen;
+static uint8 g_applied_output_method;
+static bool g_applied_linear;
 
 static void SDLCALL AudioCallback(void *userdata, Uint8 *stream, int len) {
   if (SDL_LockMutex(g_audio_mutex)) Die("Mutex lock failed!");
@@ -228,12 +234,11 @@ static bool SdlRenderer_Init(SDL_Window *window) {
   g_renderer = renderer;
   if (!g_config.ignore_aspect_ratio)
     SDL_RenderSetLogicalSize(renderer, g_snes_width, g_snes_height);
-  if (g_config.linear_filtering)
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, g_config.linear_filtering ? "best" : "0");
 
   int tex_mult = (g_ppu_render_flags & kPpuRenderFlags_4x4Mode7) ? 4 : 1;
   g_texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
-                                g_snes_width * tex_mult, g_snes_height * tex_mult);
+                                (256 + 2 * kPpuExtraLeftRight) * tex_mult, g_snes_height * tex_mult);
   if (g_texture == NULL) {
     printf("Failed to create texture: %s\n", SDL_GetError());
     return false;
@@ -274,7 +279,176 @@ static const struct RendererFuncs kSdlRendererFuncs  = {
   &SdlRenderer_EndDraw,
 };
 
-void OpenGLRenderer_Create(struct RendererFuncs *funcs, bool use_opengl_es);
+static bool OutputMethodUsesGL(uint8 method) {
+  return method == kOutputMethod_OpenGL || method == kOutputMethod_OpenGL_ES;
+}
+
+static void Settings_RecreateSdlTexture(void) {
+  if (!g_renderer)
+    return;
+  if (g_texture) {
+    SDL_DestroyTexture(g_texture);
+    g_texture = NULL;
+  }
+  SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, g_config.linear_filtering ? "best" : "0");
+  int tex_mult = (g_ppu_render_flags & kPpuRenderFlags_4x4Mode7) ? 4 : 1;
+  int tex_w = (256 + 2 * kPpuExtraLeftRight) * tex_mult;
+  int tex_h = IntMax(g_snes_height, 224) * tex_mult;
+  g_texture = SDL_CreateTexture(g_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING,
+                                tex_w, tex_h);
+  if (!g_texture)
+    fprintf(stderr, "Warning: Failed to recreate video texture: %s\n", SDL_GetError());
+  if (g_config.ignore_aspect_ratio)
+    SDL_RenderSetLogicalSize(g_renderer, 0, 0);
+  else
+    SDL_RenderSetLogicalSize(g_renderer, g_snes_width, g_snes_height);
+}
+
+static void Settings_RecreateRenderer(void) {
+  if (!g_window)
+    return;
+  if (g_renderer_funcs.Destroy)
+    g_renderer_funcs.Destroy();
+  g_renderer = NULL;
+  g_texture = NULL;
+
+  bool want_gl = OutputMethodUsesGL(g_config.output_method);
+  uint32 cur_flags = SDL_GetWindowFlags(g_window);
+  bool have_gl = (cur_flags & SDL_WINDOW_OPENGL) != 0;
+
+  if (want_gl != have_gl) {
+    int x, y, w, h;
+    SDL_GetWindowPosition(g_window, &x, &y);
+    SDL_GetWindowSize(g_window, &w, &h);
+    uint32 new_flags = g_win_flags;
+    new_flags &= ~SDL_WINDOW_OPENGL;
+    if (want_gl)
+      new_flags |= SDL_WINDOW_OPENGL;
+    SDL_DestroyWindow(g_window);
+    g_window = SDL_CreateWindow(kWindowTitle, x, y, w, h, new_flags);
+    if (!g_window) {
+      fprintf(stderr, "Warning: Failed to recreate window: %s\n", SDL_GetError());
+      return;
+    }
+    g_win_flags = new_flags;
+    SDL_SetWindowHitTest(g_window, HitTestCallback, NULL);
+  }
+
+  if (want_gl)
+    OpenGLRenderer_Create(&g_renderer_funcs, g_config.output_method == kOutputMethod_OpenGL_ES);
+  else
+    g_renderer_funcs = kSdlRendererFuncs;
+
+  if (!g_renderer_funcs.Initialize(g_window))
+    fprintf(stderr, "Warning: Failed to reinitialize renderer\n");
+}
+
+static void Settings_ReopenAudioNow(void) {
+  if (g_audio_device) {
+    SDL_PauseAudioDevice(g_audio_device, 1);
+    SDL_CloseAudioDevice(g_audio_device);
+    g_audio_device = 0;
+  }
+  free(g_audiobuffer);
+  g_audiobuffer = NULL;
+  g_audiobuffer_cur = NULL;
+  g_audiobuffer_end = NULL;
+
+  if (!g_config.enable_audio)
+    return;
+
+  if (g_config.audio_freq < 11025 || g_config.audio_freq > 48000)
+    g_config.audio_freq = kDefaultFreq;
+  if (g_config.audio_channels < 1 || g_config.audio_channels > 2)
+    g_config.audio_channels = kDefaultChannels;
+  if (g_config.audio_samples <= 0 || ((g_config.audio_samples & (g_config.audio_samples - 1)) != 0))
+    g_config.audio_samples = kDefaultSamples;
+
+  SDL_AudioSpec want = { 0 }, have;
+  want.freq = g_config.audio_freq;
+  want.format = AUDIO_S16;
+  want.channels = g_config.audio_channels;
+  want.samples = g_config.audio_samples;
+  want.callback = &AudioCallback;
+  g_audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+  if (!g_audio_device) {
+    fprintf(stderr, "Failed to open audio device: %s\n", SDL_GetError());
+    return;
+  }
+  g_audio_channels = have.channels;
+  g_frames_per_block = (534 * have.freq) / 32000;
+  g_audiobuffer = malloc(g_frames_per_block * have.channels * sizeof(int16));
+  if (!g_paused)
+    SDL_PauseAudioDevice(g_audio_device, 0);
+}
+
+void Settings_ApplyAudio(void) {
+  g_need_audio_reopen = true;
+}
+
+void Settings_PollDeferred(void) {
+  if (!g_need_audio_reopen)
+    return;
+  g_need_audio_reopen = false;
+  Settings_ReopenAudioNow();
+}
+
+void Settings_ApplyVideo(void) {
+  if (!g_zenv.ppu)
+    return;
+
+  int extra = (int)UintMin(g_config.extended_aspect_ratio, kPpuExtraLeftRight);
+  g_zenv.ppu->extraLeftRight = extra;
+  PpuSetExtraSideSpace(g_zenv.ppu, extra, extra, 16);
+
+  int new_w = extra * 2 + 256;
+  int new_h = g_config.extend_y ? 240 : 224;
+  uint32 new_flags = g_config.new_renderer * kPpuRenderFlags_NewRenderer |
+                     g_config.enhanced_mode7 * kPpuRenderFlags_4x4Mode7 |
+                     g_config.extend_y * kPpuRenderFlags_Height240 |
+                     g_config.no_sprite_limits * kPpuRenderFlags_NoSpriteLimits;
+  bool size_changed = (new_w != g_snes_width) || (new_h != g_snes_height) ||
+                      ((new_flags ^ g_ppu_render_flags) & kPpuRenderFlags_4x4Mode7);
+  bool output_changed = g_applied_output_method != g_config.output_method;
+  bool filter_changed = g_applied_linear != g_config.linear_filtering;
+  g_snes_width = new_w;
+  g_snes_height = new_h;
+  g_ppu_render_flags = new_flags;
+
+  if (g_window && output_changed) {
+    Settings_RecreateRenderer();
+  } else if (g_renderer && (size_changed || filter_changed)) {
+    Settings_RecreateSdlTexture();
+  } else if (g_renderer) {
+    if (g_config.ignore_aspect_ratio)
+      SDL_RenderSetLogicalSize(g_renderer, 0, 0);
+    else
+      SDL_RenderSetLogicalSize(g_renderer, g_snes_width, g_snes_height);
+  }
+  g_applied_output_method = g_config.output_method;
+  g_applied_linear = g_config.linear_filtering;
+
+  if (!g_window)
+    return;
+
+  int want_scale = g_config.window_scale ? IntMin(g_config.window_scale, kMaxWindowScale) : 2;
+  uint32 fs = 0;
+  if (g_config.fullscreen == 1)
+    fs = SDL_WINDOW_FULLSCREEN_DESKTOP;
+  else if (g_config.fullscreen == 2)
+    fs = SDL_WINDOW_FULLSCREEN;
+
+  if (g_current_window_scale == (uint8)want_scale &&
+      (g_win_flags & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) == fs &&
+      !size_changed && !output_changed)
+    return;
+
+  g_current_window_scale = (uint8)want_scale;
+  g_win_flags = (g_win_flags & ~(SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP)) | fs;
+  SDL_SetWindowFullscreen(g_window, fs);
+  if (!fs)
+    SDL_SetWindowSize(g_window, want_scale * g_snes_width, want_scale * g_snes_height);
+}
 
 #undef main
 int main(int argc, char** argv) {
@@ -354,26 +528,16 @@ int main(int argc, char** argv) {
 
   if (!g_renderer_funcs.Initialize(window))
     return 1;
+  g_applied_output_method = g_config.output_method;
+  g_applied_linear = g_config.linear_filtering;
 
-  SDL_AudioDeviceID device = 0;
-  SDL_AudioSpec want = { 0 }, have;
   g_audio_mutex = SDL_CreateMutex();
   if (!g_audio_mutex) Die("No mutex");
 
-  if (g_config.enable_audio) {
-    want.freq = g_config.audio_freq;
-    want.format = AUDIO_S16;
-    want.channels = g_config.audio_channels;
-    want.samples = g_config.audio_samples;
-    want.callback = &AudioCallback;
-    device = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-    if (device == 0) {
-      printf("Failed to open audio device: %s\n", SDL_GetError());
-      return 1;
-    }
-    g_audio_channels = have.channels;
-    g_frames_per_block = (534 * have.freq) / 32000;
-    g_audiobuffer = malloc(g_frames_per_block * have.channels * sizeof(int16));
+  Settings_ReopenAudioNow();
+  if (g_config.enable_audio && !g_audio_device) {
+    printf("Failed to open audio device: %s\n", SDL_GetError());
+    return 1;
   }
 
   if (argc >= 1 && !g_run_without_emu)
@@ -442,8 +606,8 @@ int main(int argc, char** argv) {
 
     if (g_paused != audiopaused) {
       audiopaused = g_paused;
-      if (device)
-        SDL_PauseAudioDevice(device, audiopaused);
+      if (g_audio_device)
+        SDL_PauseAudioDevice(g_audio_device, audiopaused);
     }
 
     if (g_paused) {
@@ -460,6 +624,7 @@ int main(int argc, char** argv) {
     SDL_LockMutex(g_audio_mutex);
     bool is_replay = ZeldaRunFrame(inputs);
     SDL_UnlockMutex(g_audio_mutex);
+    Settings_PollDeferred();
 
     frameCtr++;
 
@@ -499,9 +664,10 @@ int main(int argc, char** argv) {
     HandleCommand(kKeys_Save + 0, true);
 
   // clean sdl
-  if (g_config.enable_audio) {
-    SDL_PauseAudioDevice(device, 1);
-    SDL_CloseAudioDevice(device);
+  if (g_audio_device) {
+    SDL_PauseAudioDevice(g_audio_device, 1);
+    SDL_CloseAudioDevice(g_audio_device);
+    g_audio_device = 0;
   }
 
   SDL_DestroyMutex(g_audio_mutex);

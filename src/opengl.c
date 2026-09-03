@@ -10,6 +10,7 @@
 #define CODE(...) #__VA_ARGS__
 
 static SDL_Window *g_window;
+static SDL_GLContext g_gl_context;
 static uint8 *g_screen_buffer;
 static size_t g_screen_buffer_size;
 static int g_draw_width, g_draw_height;
@@ -37,8 +38,11 @@ static void GL_APIENTRY MessageCallback(GLenum source,
 
 static bool OpenGLRenderer_Init(SDL_Window *window) {
   g_window = window;
-  SDL_GLContext context = SDL_GL_CreateContext(window);
-  (void)context;
+  g_gl_context = SDL_GL_CreateContext(window);
+  if (!g_gl_context) {
+    fprintf(stderr, "Failed to create OpenGL context: %s\n", SDL_GetError());
+    return false;
+  }
 
   SDL_GL_SetSwapInterval(1);
   ogl_LoadFunctions();
@@ -176,6 +180,31 @@ static bool OpenGLRenderer_Init(SDL_Window *window) {
 }
 
 static void OpenGLRenderer_Destroy() {
+  if (g_glsl_shader) {
+    GlslShader_Destroy(g_glsl_shader);
+    g_glsl_shader = NULL;
+  }
+  if (g_texture.gl_texture) {
+    glDeleteTextures(1, &g_texture.gl_texture);
+    g_texture.gl_texture = 0;
+    g_texture.width = 0;
+    g_texture.height = 0;
+  }
+  if (g_VAO) {
+    glDeleteVertexArrays(1, &g_VAO);
+    g_VAO = 0;
+  }
+  if (g_program) {
+    glDeleteProgram(g_program);
+    g_program = 0;
+  }
+  free(g_screen_buffer);
+  g_screen_buffer = NULL;
+  g_screen_buffer_size = 0;
+  if (g_gl_context) {
+    SDL_GL_DeleteContext(g_gl_context);
+    g_gl_context = NULL;
+  }
 }
 
 static void OpenGLRenderer_BeginDraw(int width, int height, uint8 **pixels, int *pitch) {

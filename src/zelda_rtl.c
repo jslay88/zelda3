@@ -12,6 +12,7 @@
 #include "audio.h"
 #include "assets.h"
 #include "ow_wide.h"
+#include "settings_menu.h"
 ZeldaEnv g_zenv;
 uint8 g_ram[131072];
 
@@ -201,8 +202,7 @@ void ZeldaDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags) {
       PpuSetMode7PerspectiveCorrection(g_zenv.ppu, 0, 0);
   }
 
-  if (g_zenv.ppu->extraLeftRight != 0 || render_flags & kPpuRenderFlags_Height240)
-    ConfigurePpuSideSpace();
+  ConfigurePpuSideSpace();
 
   int height = render_flags & kPpuRenderFlags_Height240 ? 240 : 224;
 
@@ -223,6 +223,7 @@ void ZeldaDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags) {
   }
 
   OwWide_FillFrame(pixel_buffer, pitch, height);
+  SettingsMenu_Draw(pixel_buffer, pitch, height);
 }
 
 void HdmaSetup(uint32 addr6, uint32 addr7, uint8 transfer_unit, uint8 reg6, uint8 reg7, uint8 indirect_bank) {

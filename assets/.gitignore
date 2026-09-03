@@ -1,14 +1,22 @@
-zelda3.sfc
+# ROM copies and extract outputs (copyrighted). Tools stay tracked.
+*.[sS][fF][cC]
+*.[sS][mM][cC]
+*.[pP][cC][mM]
+*.[bB][rR][rR]
+*.[sS][pP][cC]
+zelda3_assets.dat
 dialogue*.txt
 generated_*.h
 linksprite.png
 map32_to_map16.txt
 music_info.yaml
+music_info.yml
 sfx.txt
 /sound
-sound_ending.txt
-sound_indoor.txt
-sound_intro.txt
+sound_*.txt
 /hud_icons.png
 /font*.png
-
+/overworld/
+/dungeon/
+/img/
+/old/

@@ -11,6 +11,7 @@
 #include "player_oam.h"
 #include "snes/snes_regs.h"
 #include "assets.h"
+#include "ow_wide.h"
 
 const uint16 kOverworld_OffsetBaseX[64] = {
   0,     0, 0x400, 0x600, 0x600, 0xa00, 0xa00, 0xe00,
@@ -831,6 +832,7 @@ after:
       music_control = 0xf1;
   }
   Overworld_LoadGFXAndScreenSize();
+  OwWide_PrefetchCamera();
   submodule_index = 1;
   BYTE(overworld_screen_trans_dir_bits) = dir;
   BYTE(overworld_screen_trans_dir_bits2) = dir;
@@ -2087,6 +2089,7 @@ void Overworld_DrawQuadrantsAndOverlays() {  // 82eec5
     ow_entrance_value = 0;
   }
   Overworld_HandleOverlaysAndBombDoors();
+  OwWide_OnOverworldLoaded();
 }
 
 void Overworld_HandleOverlaysAndBombDoors() {  // 82ef29

@@ -13,11 +13,15 @@
 /assets/old/
 /zelda3.sfc
 /zelda3.smc
+*.sfc
+*.smc
+/tables/
 /saves/*.sav
 /saves/sram.dat
 /saves/sram.bak
 /zelda3
 __pycache__
+*.o
 /src/*.o
 /*.exe
 /*.out

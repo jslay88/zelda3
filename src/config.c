@@ -374,6 +374,8 @@ static bool HandleIniConfig(int section, const char *key, char *value) {
       return true;
     } else if (StringEqualsNoCase(key, "DimFlashes")) {
       return ParseBoolBit(value, &g_config.features0, kFeatures0_DimFlashes);
+    } else if (StringEqualsNoCase(key, "SeamlessOverworld")) {
+      return ParseBool(value, &g_config.seamless_overworld);
     }
   } else if (section == 2) {
     if (StringEqualsNoCase(key, "EnableAudio")) {
@@ -518,6 +520,7 @@ static bool ParseOneConfigFile(const char *filename, int depth) {
 
 void ParseConfigFile(const char *filename) {
   g_config.msuvolume = 100;  // default msu volume, 100%
+  g_config.seamless_overworld = true;
 
   if (filename != NULL || !ParseOneConfigFile("zelda3.user.ini", 0)) {
     if (filename == NULL)

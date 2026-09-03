@@ -11,6 +11,7 @@
 #include "util.h"
 #include "audio.h"
 #include "assets.h"
+#include "ow_wide.h"
 ZeldaEnv g_zenv;
 uint8 g_ram[131072];
 
@@ -151,9 +152,15 @@ static void ConfigurePpuSideSpace() {
       extra_bottom = 16;
     } else {
       // outdoors
-      extra_left = BG2HOFS_copy2 - ow_scroll_vars0.xstart;
-      extra_right = ow_scroll_vars0.xend - BG2HOFS_copy2;
-      extra_bottom = ow_scroll_vars0.yend - BG2VOFS_copy2;
+      extra_left = (int)BG2HOFS_copy2 - (int)ow_scroll_vars0.xstart;
+      extra_right = (int)ow_scroll_vars0.xend - (int)BG2HOFS_copy2;
+      extra_bottom = (int)ow_scroll_vars0.yend - (int)BG2VOFS_copy2;
+      if (extra_left < 0)
+        extra_left = 0;
+      if (extra_right < 0)
+        extra_right = 0;
+      if (extra_bottom < 0)
+        extra_bottom = 0;
     }
   } else if (mod == 7) {
     // indoors, except when the light cone is in use
@@ -214,6 +221,8 @@ void ZeldaDrawPpuFrame(uint8 *pixel_buffer, size_t pitch, uint32 render_flags) {
     SimpleHdma_DoLine(&hdma_chans[0]);
     SimpleHdma_DoLine(&hdma_chans[1]);
   }
+
+  OwWide_FillFrame(pixel_buffer, pitch, height);
 }
 
 void HdmaSetup(uint32 addr6, uint32 addr7, uint8 transfer_unit, uint8 reg6, uint8 reg7, uint8 indirect_bank) {
